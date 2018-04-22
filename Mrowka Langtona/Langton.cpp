@@ -1,10 +1,10 @@
 #include "Langton.h"
 
 
-langton::Macierz::Macierz(int k, int w) :
-	_kol	(k),
-	_wier	(w),
-	_v		(k * w, CZARNE)
+langton::Macierz::Macierz(int k, int w) 
+	: _kol	(k)
+	, _wier	(w)
+	, _v	(k * w, CZARNE)
 {}
 
 
@@ -15,65 +15,67 @@ langton::pole & langton::Macierz::poz(const mrowka::pozycja &wspolrzedne)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-langton::Langton::Langton(
-	float			dl_pola, 
-	int				okres,
-	float			poz_x,
-	float			poz_y
-) :
-	_WYSOKOSC		(600),
-	_SZEROKOSC		(800),
-	_BOK			(dl_pola),
-	_stop			(false),
-	m_okres			(sf::milliseconds(okres)),
-	m_sleep			(sf::milliseconds(50)),
-	m_render		(nullptr),
-	m_plansza(
-		_SZEROKOSC / (unsigned int)_BOK, 
-		_WYSOKOSC / (unsigned int)_BOK
-	),
-	m_mrowka(
-		mrowka::pozycja(
-			(int)(_SZEROKOSC / (int)_BOK * poz_x),
-			(int)(_WYSOKOSC / (int)_BOK * poz_y)
-		),
-		m_plansza._kol, 
-		m_plansza._wier
-	)
-
+langton::Langton::Langton(float	dl_pola, 
+						int		okres)	
+	: _WYSOKOSC		(600)
+	, _SZEROKOSC	(800)
+	, _BOK			(dl_pola)
+	, m_okres		(sf::milliseconds(okres))
+	, m_sleep		(sf::milliseconds(50))
+	, m_render		(nullptr)
+	, m_plansza		(_SZEROKOSC / (unsigned int)_BOK, 
+					_WYSOKOSC / (unsigned int)_BOK)
 {
+	mrowka::Mrowka::Init(m_plansza._kol, m_plansza._wier, _BOK);
+
 	if (m_okres < m_sleep){
-		//m_sleep = m_okres;
 		m_sleep = sf::Time(sf::milliseconds(0));
 	}
 
 	m_kwadrat.setSize(sf::Vector2f(_BOK, _BOK));
 	m_kwadrat.setFillColor(sf::Color(250, 250, 250));
-	
-	m_mrowka._wyglad.setSize(sf::Vector2f(_BOK, _BOK));
-	m_mrowka._wyglad.setFillColor(sf::Color( 250, 0, 0 ));
-
-	auto pos = m_mrowka.poz();
-	m_mrowka._wyglad.setPosition(_BOK * ((float)pos.first + 0.5f), _BOK * ((float)pos.second + 0.5f));
-}
-
-
-langton::Langton::~Langton()
-{
-	/*if (m_render != nullptr)
-		delete m_render;*/
 }
 
 
 void langton::Langton::uruchom()
 {
+	if (m_lista_mrowek.empty())
+		return;
+
 	m_render = std::make_unique<sf::RenderWindow>(sf::VideoMode(_SZEROKOSC, _WYSOKOSC), "Mrowka Langtona");
 	petla();
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void langton::Langton::wykonaj_ruch()
+void langton::Langton::dodaj_mrowke(const float & poz_x, const float & poz_y, const mrowka::kierunek & kier)
+{
+	m_lista_mrowek.push_back(mrowka::Mrowka(oblicz_pozycje_mrowki(poz_x, poz_y), kier));
+}
+
+
+void langton::Langton::losuj_mrowki(const int & ile)
+{
+	std::mt19937 m_rnd;
+	m_rnd.seed(std::clock());
+	std::uniform_real_distribution<float> dystr(0, 1);
+
+	mrowka::kierunek k;
+	for (int i = 0; i < ile; i++)
+	{
+		switch ((int)(dystr(m_rnd)*4.f))
+		{
+		case 0: k = mrowka::PRZOD; break;
+		case 1: k = mrowka::PRAWY; break;
+		case 2: k = mrowka::TYL; break;
+		case 3: k = mrowka::LEWY; break;
+		}
+
+		dodaj_mrowke(dystr(m_rnd), dystr(m_rnd), k);
+	}
+}
+
+
+void langton::Langton::wykonaj_ruch(mrowka::Mrowka & m_mrowka)
 {
 	if (m_plansza.poz(m_mrowka.poz()) == CZARNE) {
 		m_mrowka.wykonaj_obrot(mrowka::PRAWO);
@@ -83,11 +85,9 @@ void langton::Langton::wykonaj_ruch()
 		m_plansza.poz(m_mrowka.poz()) = CZARNE;
 	}
 
-	if (!m_mrowka.wykonaj_krok_naprzod())
-		_stop = true;
+	m_mrowka.wykonaj_krok_naprzod();
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void langton::Langton::rysuj()
 {
@@ -101,12 +101,14 @@ void langton::Langton::rysuj()
 		}
 	}
 
-	auto pos = m_mrowka.poz();
-	m_mrowka._wyglad.setPosition(_BOK * ((float)pos.first + 0.5f), _BOK * ((float)pos.second + 0.5f));
-	m_render->draw(m_mrowka._wyglad);
+	for (auto & m_mrowka : m_lista_mrowek)
+	{
+		auto pos = m_mrowka.poz();
+		m_mrowka._wyglad.setPosition(_BOK * ((float)pos.first + 0.5f), _BOK * ((float)pos.second + 0.5f));
+		m_render->draw(m_mrowka._wyglad);
+	}
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void langton::Langton::petla()
 {
@@ -130,9 +132,11 @@ void langton::Langton::petla()
 		sf::sleep(m_sleep);
 		m_pulpit.Update(clock.restart().asSeconds()); // odœwie¿anie programu
 
-		if (zegar.getElapsedTime() >= m_okres && !_stop)
+		if (zegar.getElapsedTime() >= m_okres)
 		{
-			wykonaj_ruch();
+			for (auto & m_mrowka : m_lista_mrowek)
+				wykonaj_ruch(m_mrowka);
+
 			zegar.restart();
 
 			//rysowanie aplikacji
@@ -142,4 +146,10 @@ void langton::Langton::petla()
 			m_render->display();
 		}
 	}
+}
+
+
+mrowka::pozycja	langton::Langton::oblicz_pozycje_mrowki(const float & poz_x, const float & poz_y)
+{
+	return mrowka::pozycja((int)(_SZEROKOSC / (int)_BOK * poz_x), (int)(_WYSOKOSC / (int)_BOK * poz_y));
 }

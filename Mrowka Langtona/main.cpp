@@ -2,7 +2,8 @@
 
 int main()
 {
-	langton::Langton sym(10, 1, 0.5f, 0.5f);
+	langton::Langton sym(10, 1);
+	sym.losuj_mrowki(8);
 	sym.uruchom();
 
 	return 0;

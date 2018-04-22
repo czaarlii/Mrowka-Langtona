@@ -1,7 +1,7 @@
 #pragma once
 
 #include <SFML\Graphics.hpp>
-#include <utility>
+
 
 namespace mrowka{
 
@@ -13,24 +13,25 @@ namespace mrowka{
 	class Mrowka
 	{
 	public:
-		Mrowka(
-			const pozycja		&poz_poczatkowa, 
-			int					x_max, 
-			int					y_max
-		);
+		Mrowka(const pozycja &poz_poczatkowa, const kierunek & kier_poczatkowy = PRZOD);
 
-		pozycja		poz();
-		void		wykonaj_obrot(const obrot & ob);
-		bool		wykonaj_krok_naprzod();
+		static void		Init(int x_max, int y_max, float BOK);
+
+		pozycja			poz();
+		void			wykonaj_obrot(const obrot & ob);
+		void			wykonaj_krok_naprzod();
 
 		sf::RectangleShape	_wyglad;
 
 	private:
+		static int		mr_max_x;
+		static int		mr_max_y;
+		static float	_BOK;
+
 		pozycja			mr_poz;
 		sf::Color		mr_kolor;
 		kierunek		mr_kierunek;
-		static int		mr_max_x;
-		static int		mr_max_y;
+
 	};
 
 }
